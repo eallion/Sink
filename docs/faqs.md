@@ -51,7 +51,41 @@ To improve query performance, we have limited the amount of data. If you need to
 
 Set `NUXT_DISABLE_BOT_ACCESS_LOG` to `true`.
 
-## 9. How does the Import/Export feature work?
+## 9. What is Link Cloaking?
+
+Link cloaking masks your destination URL by showing your short link domain in the browser address bar instead of redirecting to the target URL. The destination page loads inside a full-screen iframe.
+
+### How to enable it
+
+Toggle **Enable Link Cloaking** in the **Link Settings** section when creating or editing a link.
+
+### Limitations
+
+- **Sites that block iframes**: Websites with `X-Frame-Options: DENY` or `Content-Security-Policy: frame-ancestors 'none'` will not load inside the iframe. Most major sites (Google, GitHub, Twitter, etc.) block iframe embedding.
+- **HTTPS required**: The destination URL must use HTTPS. Mixed content (HTTPS short link → HTTP destination) will be blocked by browsers.
+- **Limited interaction**: Some features like OAuth login flows, `window.top` navigation, and certain payment forms may not work correctly inside the iframe.
+- **Device redirects take priority**: If both cloaking and device redirects (iOS/Android) are configured, device redirects will take precedence on matching devices.
+
+### If the destination site blocks iframes
+
+If you control the destination site, you can whitelist your short link domain by adding this response header:
+
+```
+Content-Security-Policy: frame-ancestors 'self' your-short-domain.com
+```
+
+## 10. What is Redirect with Query Parameters?
+
+When enabled, query parameters from the short link URL are appended to the destination URL. For example, visiting `https://s.ink/my-link?ref=twitter` would redirect to `https://example.com/page?ref=twitter`.
+
+### Per-link vs Global
+
+- **Global setting**: Set `NUXT_REDIRECT_WITH_QUERY=true` to enable for all links by default.
+- **Per-link override**: Toggle **Redirect with Query Parameters** in the **Link Settings** section when creating or editing a link. This overrides the global setting for that specific link.
+
+If a link has no per-link setting, it falls back to the global configuration.
+
+## 11. How does the Import/Export feature work?
 
 Import and Export are designed to work within Cloudflare Workers' KV operation limits (50 per request by default).
 
@@ -60,3 +94,20 @@ Import and Export are designed to work within Cloudflare Workers' KV operation l
 - **Expired links**: Imported as-is to support migration scenarios.
 - **Duplicate slugs**: Skipped during import (existing links are preserved).
 - **Validation**: All links are validated against the schema before import starts.
+- **Passwords**: Exported password values are masked. Masked passwords are preserved during import and cannot be submitted as new plaintext passwords.
+
+## 12. How do password-protected and unsafe links work?
+
+- **Password protection**: Visitors see a password form before redirecting. Programmatic clients can send the `x-link-password` header when requesting the short link.
+- **Unsafe warning**: Links marked as unsafe show a warning page before redirecting. Programmatic clients can send `x-link-confirm: true` after confirming the destination.
+- **Automatic unsafe detection**: Set `NUXT_SAFE_BROWSING_DOH` to a DoH endpoint to mark suspicious destinations automatically during create or edit.
+
+## 13. How does geo-routing work?
+
+Geo-routing redirects visitors to country-specific URLs based on Cloudflare's `request.cf.country` value. Configure a two-letter country code map such as `{ "US": "https://example.com/us" }` in the link settings or API `geo` field.
+
+Device routing takes precedence when an Apple or Android device-specific URL matches the visitor.
+
+## 14. How can I export analytics data?
+
+Use the dashboard's access export feature or call `GET /api/stats/export` with the same filter parameters used by analytics views, such as `startAt`, `endAt`, `slug`, `country`, `browser`, or `device`. The API returns a CSV file with `slug`, `url`, `viewer`, `views`, and `referer` columns.

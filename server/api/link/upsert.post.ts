@@ -21,6 +21,8 @@ defineRouteMeta({
               image: { type: 'string', description: 'Custom image for link preview' },
               apple: { type: 'string', description: 'Apple App Store redirect URL' },
               google: { type: 'string', description: 'Google Play Store redirect URL' },
+              unsafe: { type: 'boolean', description: 'Mark link as unsafe, showing a warning page before redirect' },
+              geo: { type: 'object', additionalProperties: { type: 'string' }, description: 'Geo-routing rules (country code to URL)' },
             },
           },
         },
@@ -32,16 +34,16 @@ defineRouteMeta({
 export default eventHandler(async (event) => {
   const link = await readValidatedBody(event, LinkSchema.parse)
 
-  link.slug = normalizeSlug(event, link.slug)
+  await prepareIncomingLink(event, link)
 
   const existingLink = await getLink(event, link.slug)
   if (existingLink) {
-    const shortLink = buildShortLink(event, link.slug)
-    return { link: existingLink, shortLink, status: 'existing' }
+    return { ...buildLinkResponse(event, existingLink), status: 'existing' }
   }
+
+  await hashLinkPasswordForCreate(link)
 
   await putLink(event, link)
   setResponseStatus(event, 201)
-  const shortLink = buildShortLink(event, link.slug)
-  return { link, shortLink, status: 'created' }
+  return { ...buildLinkResponse(event, link), status: 'created' }
 })

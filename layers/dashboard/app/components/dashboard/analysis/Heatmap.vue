@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { HeatmapDataPoint } from '@/types'
-import { watchDeep } from '@vueuse/core'
+import { watchThrottled } from '@vueuse/core'
 
 const props = withDefaults(defineProps<{
   metric?: 'visits' | 'visitors'
@@ -12,6 +12,7 @@ const heatmapData = shallowRef<HeatmapDataPoint[]>([])
 const isLoaded = ref(false)
 const id = inject(LINK_ID_KEY, computed(() => undefined))
 const analysisStore = useDashboardAnalysisStore()
+const { locale } = useI18n()
 
 const effectiveTimeRange = computed(() => ({
   startAt: analysisStore.dateRange.startAt,
@@ -20,7 +21,7 @@ const effectiveTimeRange = computed(() => ({
 
 const effectiveFilters = computed(() => analysisStore.filters)
 
-const weekdays = getWeekdayNames('short')
+const weekdays = computed(() => getWeekdayNames('short', locale.value))
 // weekday indices: Monday=1, Tuesday=2, ..., Sunday=7 (ISO 8601)
 const weekdayIndices = [1, 2, 3, 4, 5, 6, 7]
 
@@ -64,7 +65,7 @@ function getCellColor(weekday: number, hour: number): string {
   return `color-mix(in srgb, ${color} ${Math.round(alpha * 100)}%, transparent)`
 }
 
-async function getHeatmapData(signal?: AbortSignal) {
+async function getHeatmapData() {
   isLoaded.value = false
   const { startAt, endAt } = effectiveTimeRange.value
   const result = await useAPI<{ data: HeatmapDataPoint[] }>('/api/stats/heatmap', {
@@ -75,7 +76,6 @@ async function getHeatmapData(signal?: AbortSignal) {
       endAt,
       ...effectiveFilters.value,
     },
-    signal,
   })
   heatmapData.value = (result.data || []).map(item => ({
     ...item,
@@ -88,20 +88,14 @@ async function getHeatmapData(signal?: AbortSignal) {
   isLoaded.value = true
 }
 
-watchDeep(
+watchThrottled(
   [effectiveTimeRange, effectiveFilters],
-  async () => {
-    const controller = new AbortController()
-    onWatcherCleanup(() => controller.abort())
-
-    try {
-      await getHeatmapData(controller.signal)
-    }
-    catch (e) {
-      if (e instanceof Error && e.name === 'AbortError')
-        return
-      throw e
-    }
+  getHeatmapData,
+  {
+    deep: true,
+    throttle: 500,
+    leading: true,
+    trailing: true,
   },
 )
 
@@ -160,7 +154,7 @@ onMounted(() => {
                       hover:ring-1 hover:ring-foreground/10
                     "
                     role="gridcell"
-                    :aria-label="`${weekdays[arrayIdx]} ${hour}:00 - ${metric === 'visits' ? $t('dashboard.visits') : $t('dashboard.visitors')}: ${formatNumber(getCellValue(weekdayIdx, hour))}`"
+                    :aria-label="`${weekdays[arrayIdx]} ${hour}:00 - ${metric === 'visits' ? $t('dashboard.visits') : $t('dashboard.visitors')}: ${formatNumber(getCellValue(weekdayIdx, hour), locale)}`"
                     :style="{
                       backgroundColor: getCellColor(weekdayIdx, hour),
                     }"
@@ -172,7 +166,7 @@ onMounted(() => {
                   </p>
                   <p class="text-muted-foreground">
                     {{ metric === 'visits' ? $t('dashboard.visits') : $t('dashboard.visitors') }}:
-                    {{ formatNumber(getCellValue(weekdayIdx, hour)) }}
+                    {{ formatNumber(getCellValue(weekdayIdx, hour), locale) }}
                   </p>
                 </TooltipContent>
               </Tooltip>

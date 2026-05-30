@@ -32,9 +32,11 @@ Cache links can speed up access, but setting them too long may result in slow ch
 
 ## `NUXT_REDIRECT_WITH_QUERY`
 
-URL parameters are not carried during link redirection by default and it is not recommended to enable this feature.
+URL parameters are not carried during link redirection by default and it is not recommended to enable this feature. This is the global default; individual links can override this via the **Redirect with Query Parameters** toggle in **Link Settings**.
 
 ## `NUXT_HOME_URL`
+
+> If you are using Worker deployment, this variable needs to be configured in **Settings** -> **Build** -> **Variables and Secrets** and **Settings** -> **Variables and Secrets**.
 
 The default Sink homepage is the introduction page, you can replace it with your own website.
 
@@ -44,16 +46,26 @@ The Analytics Engine DATASET, it is not recommended to modify unless you need to
 
 ## `NUXT_AI_MODEL`
 
-You can modify the large model yourself. The supported names can be viewed at [Workers AI Models](https://developers.cloudflare.com/workers-ai/models/#text-generation).
+You can modify the large model used for AI slug and OpenGraph metadata generation. The supported names can be viewed at [Workers AI Models](https://developers.cloudflare.com/workers-ai/models/#text-generation).
 
 ## `NUXT_AI_PROMPT`
 
-Supports custom prompts, it is recommended to keep the placeholder {slugRegex}.
+Supports custom prompts for AI slug generation. It is recommended to keep the placeholder `{slugRegex}`. Sink sends the URL and, when available, extracted page content to the model.
 
 Default prompt:
 
 ```txt
-You are a URL shortening assistant, please shorten the URL provided by the user into a SLUG. The SLUG information must come from the URL itself, do not make any assumptions. A SLUG is human-readable and should not exceed three words and can be validated using regular expressions {slugRegex} . Only the best one is returned, the format must be JSON reference {"slug": "example-slug"}
+You are a URL shortening assistant, please shorten the URL provided by the user into a SLUG. The SLUG information should be derived from the URL and page content (if provided). Do not make any assumptions beyond the given information. A SLUG is human-readable and should not exceed three words and can be validated using regular expressions {slugRegex} . Only the best one is returned, the format must be JSON reference {"slug": "example-slug"}
+```
+
+## `NUXT_AI_OG_PROMPT`
+
+Supports custom prompts for AI OpenGraph title and description generation. Sink appends the preferred locale to the prompt so the generated metadata matches the visitor or dashboard language.
+
+Default prompt:
+
+```txt
+You are an OpenGraph metadata assistant. Please summarize the page content provided by the user into a perfect title and description for an OpenGraph preview. Do not make any assumptions beyond the given information. Only the best one is returned, the format must be JSON reference {"title": "Example Title", "description": "Example description that summarizes the page accurately."}
 ```
 
 ## `NUXT_CASE_SENSITIVE`
@@ -82,3 +94,19 @@ This feature requires:
 2. Create R2 bucket: `wrangler r2 bucket create sink`
 
 Backups are stored in R2 with the path `backups/links-{timestamp}.json` and run daily at 00:00 UTC.
+
+## `NUXT_SAFE_BROWSING_DOH`
+
+Set to a DNS over HTTPS (DoH) endpoint URL to enable automatic unsafe link detection when creating or editing links. When enabled, Sink queries the DoH service to check if the destination domain is flagged as malicious. If the domain resolves to `0.0.0.0`, the link is automatically marked as unsafe and visitors will see a warning page before being redirected.
+
+Recommended values:
+
+- `https://family.cloudflare-dns.com/dns-query` — Cloudflare Family DNS (blocks malware and adult content)
+- Custom [Cloudflare Zero Trust Gateway](https://developers.cloudflare.com/cloudflare-one/policies/gateway/) DoH URL — supports custom block lists, domain risk categories, and more granular control
+
+Default is empty (disabled). Users can still manually mark links as unsafe in the dashboard regardless of this setting.
+
+## `NUXT_NOT_FOUND_REDIRECT`
+
+Optional custom redirect target when a slug is not found.
+If this is not set, Sink will fall back to its default 404 page.

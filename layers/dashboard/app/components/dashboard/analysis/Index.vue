@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { Link } from '@/types'
-import { getLocalTimeZone, now } from '@internationalized/date'
 
 withDefaults(defineProps<{
   link?: Link | null
@@ -9,29 +8,18 @@ withDefaults(defineProps<{
 })
 
 const analysisStore = useDashboardAnalysisStore()
-const tz = getLocalTimeZone()
 
 const viewMode = ref<'trend' | 'heatmap'>('trend')
 const heatmapMetric = ref<'visits' | 'visitors'>('visits')
 
-function initDateRange() {
-  if (analysisStore.dateRange.startAt === 0) {
-    analysisStore.setDateRange([
-      date2unix(now(tz).subtract({ days: 7 })),
-      date2unix(now(tz)),
-    ])
-  }
-}
-
 onBeforeMount(() => {
-  analysisStore.restoreFromUrl()
-  initDateRange()
+  analysisStore.init()
 })
 </script>
 
 <template>
   <h3 v-if="link" class="text-xl leading-10 font-bold">
-    {{ link.slug }} {{ $t('dashboard.stats') }}
+    {{ $t('dashboard.stats', { slug: link.slug }) }}
   </h3>
   <DashboardAnalysisCounters />
   <Tabs v-model="viewMode" default-value="trend">
